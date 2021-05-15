@@ -6,11 +6,11 @@ import (
 	"os"
 	"os/exec"
 
-	hbot "github.com/whyrusleeping/hellabot"
+	hbot "github.com/otaviokr/hellivabot"
 )
 
 // This trigger will op people in the given list who ask by saying "-opme"
-var oplist = []string{"whyrusleeping", "tlane", "ltorvalds"}
+var oplist = []string{"otaviokr", "tlane", "ltorvalds"}
 var opPeople = hbot.Trigger{
 	Condition: func(bot *hbot.Bot, m *hbot.Message) bool {
 		if m.Content == "-opme" {

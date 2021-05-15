@@ -1,4 +1,4 @@
-// This is an example program showing the usage of hellabot
+// This is an example program showing the usage of hellivabot
 package main
 
 import (
@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	hbot "github.com/whyrusleeping/hellabot"
-	log "gopkg.in/inconshreveable/log15.v2"
+	hbot "github.com/otaviokr/hellivabot"
 )
 
 var serv = flag.String("server", "testnet.oragono.io:6697", "hostname and port for irc server to connect to")
-var nick = flag.String("nick", "hellabot", "nickname for the bot")
-var password = flag.String("password", "hellabotspassword", "password for the bot")
+var nick = flag.String("nick", "hellivabot", "nickname for the bot")
+var password = flag.String("password", "hellivabotspassword", "password for the bot")
 
 func main() {
 	flag.Parse()
@@ -33,12 +32,6 @@ func main() {
 
 	irc.AddTrigger(sayInfoMessage)
 	irc.AddTrigger(longTrigger)
-	irc.Logger.SetHandler(log.StdoutHandler)
-	// logHandler := log.LvlFilterHandler(log.LvlInfo, log.StdoutHandler)
-	// or
-	// irc.Logger.SetHandler(logHandler)
-	// or
-	// irc.Logger.SetHandler(log.StreamHandler(os.Stdout, log.JsonFormat()))
 
 	// Start up bot (this blocks until we disconnect)
 	irc.Run()

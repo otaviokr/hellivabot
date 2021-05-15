@@ -9,8 +9,7 @@ import (
 	"sync"
 	"time"
 
-	log "gopkg.in/inconshreveable/log15.v2"
-	logext "gopkg.in/inconshreveable/log15.v2/ext"
+	log "github.com/sirupsen/logrus"
 	"gopkg.in/sorcix/irc.v2"
 )
 
@@ -61,10 +60,6 @@ type Bot struct {
 	TLSConfig tls.Config
 }
 
-func (bot *Bot) String() string {
-	return fmt.Sprintf("Server: %s, Channels: %v, Nick: %s", bot.Host, bot.Channels, bot.Nick)
-}
-
 // NewBot creates a new instance of Bot
 func NewBot(host, nick string, options ...func(*Bot)) (*Bot, error) {
 	// Defaults are set here
@@ -89,73 +84,21 @@ func NewBot(host, nick string, options ...func(*Bot)) (*Bot, error) {
 		option(&bot)
 	}
 	// Discard logs by default
-	bot.Logger = log.New("id", logext.RandId(8), "host", bot.Host, "nick", log.Lazy{bot.getNick})
+	// bot.Logger = log.New("id", logext.RandId(8), "host", bot.Host, "nick", log.Lazy{bot.getNick})
 
-	bot.Logger.SetHandler(log.DiscardHandler())
+	// bot.Logger.SetHandler(log.DiscardHandler())
 	bot.AddTrigger(pingPong)
 	bot.AddTrigger(joinChannels)
 	return &bot, nil
 }
 
+func (bot *Bot) String() string {
+	return fmt.Sprintf("Server: %s, Channels: %v, Nick: %s", bot.Host, bot.Channels, bot.Nick)
+}
+
 // Uptime returns the uptime of the bot
 func (bot *Bot) Uptime() string {
 	return fmt.Sprintf("Started: %s, Uptime: %s", bot.started, time.Since(bot.started))
-}
-
-func (bot *Bot) getNick() string {
-	return bot.Nick
-}
-
-func (bot *Bot) connect(host string) (err error) {
-	bot.Debug("Connecting")
-	dial := bot.Dial
-	if dial == nil {
-		dial = net.Dial
-	}
-	dialTLS := bot.DialTLS
-	if dialTLS == nil {
-		dialTLS = tls.Dial
-	}
-
-	if bot.SSL {
-		bot.con, err = dialTLS("tcp", host, &bot.TLSConfig)
-	} else {
-		bot.con, err = dial("tcp", host)
-	}
-	return err
-}
-
-// Incoming message gathering routine
-func (bot *Bot) handleIncomingMessages() {
-	scan := bufio.NewScanner(bot.con)
-	for scan.Scan() {
-		// Disconnect if we have seen absolutely nothing for 300 seconds
-		bot.con.SetDeadline(time.Now().Add(bot.PingTimeout))
-		msg := ParseMessage(scan.Text())
-		bot.Debug("Incoming", "raw", scan.Text(), "msg.To", msg.To, "msg.From", msg.From, "msg.Params", msg.Params, "msg.Trailing", msg.Trailing())
-		go func() {
-			for _, h := range bot.handlers {
-				if h.Handle(bot, msg) {
-					break
-				}
-			}
-		}()
-		bot.Incoming <- msg
-	}
-	close(bot.Incoming)
-}
-
-// Handles message speed throtling
-func (bot *Bot) handleOutgoingMessages() {
-	for s := range bot.outgoing {
-		bot.Debug("Outgoing", "data", s)
-		_, err := fmt.Fprint(bot.con, s+"\r\n")
-		if err != nil {
-			bot.Error("handleOutgoingMessages fmt.Fprint error", "err", err)
-			return
-		}
-		time.Sleep(bot.ThrottleDelay)
-	}
 }
 
 // WaitFor will block until a message matching the given filter is received
@@ -165,7 +108,6 @@ func (bot *Bot) WaitFor(filter func(*Message) bool) {
 			return
 		}
 	}
-	return
 }
 
 // StandardRegistration performsa a basic set of registration commands
@@ -174,14 +116,10 @@ func (bot *Bot) StandardRegistration() {
 	if bot.Password != "" {
 		bot.Send("PASS " + bot.Password)
 	}
-	bot.Debug("Sending standard registration")
+	// bot.Debug("Sending standard registration")
+	log.Debug("sending standard registration")
 	bot.sendUserCommand(bot.Nick, bot.Nick)
 	bot.SetNick(bot.Nick)
-}
-
-// Set username, real name, and mode
-func (bot *Bot) sendUserCommand(user, realname string) {
-	bot.Send(fmt.Sprintf("USER %s 0 * :%s", user, realname))
 }
 
 // SetNick sets the bots nick on the irc server
@@ -192,26 +130,38 @@ func (bot *Bot) SetNick(nick string) {
 
 // Run starts the bot and connects to the server. Blocks until we disconnect from the server.
 func (bot *Bot) Run() {
-	bot.Debug("Starting bot goroutines")
+	// bot.Debug("Starting bot goroutines")
+	log.Debug("starting bot goroutines")
 
 	// Attempt reconnection
 	var hijack bool
 	if bot.HijackSession {
 		if bot.SSL {
-			bot.Crit("Can't Hijack a SSL connection")
+			// bot.Crit("Can't Hijack a SSL connection")
+			log.Fatal("cannot hijack a SSL connection")
 			return
 		}
 		hijack = bot.hijackSession()
-		bot.Debug("Hijack", "Did we?", hijack)
+		// bot.Debug("Hijack", "Did we?", hijack)
+		log.WithFields(
+			log.Fields{
+				"hijack": hijack,
+			}).Debug("did we hijack?")
 	}
 
 	if !hijack {
 		err := bot.connect(bot.Host)
 		if err != nil {
-			bot.Crit("bot.Connect error", "err", err.Error())
+			// bot.Crit("bot.Connect error", "err", err.Error())
+			log.WithFields(
+				log.Fields{
+					"err": err.Error(),
+					"host": bot.Host,
+				}).Fatal("failed to connect")
 			return
 		}
-		bot.Info("Connected successfully!")
+		// bot.Info("Connected successfully!")
+		log.Info("connected successfully")
 	}
 
 	go bot.handleIncomingMessages()
@@ -258,22 +208,6 @@ func (bot *Bot) Notice(who, text string) {
 	for _, line := range splitText(text) {
 		bot.Send("NOTICE " + who + " :" + line)
 	}
-}
-
-// Splits a given string into a string slice, in chunks ending
-// either with \n, or with \r\n, or of a size of 400 characters.
-func splitText(text string) []string {
-	var ret []string
-	scanner := bufio.NewScanner(strings.NewReader(text))
-	for scanner.Scan() {
-		line := scanner.Text()
-		for len(line) > 400 {
-			ret = append(ret, line[:400])
-			line = line[400:]
-		}
-		ret = append(ret, line)
-	}
-	return ret
 }
 
 // Action sends an action to 'who' (user or channel)
@@ -363,9 +297,12 @@ var joinChannels = Trigger{
 	},
 	Action: func(bot *Bot, m *Message) bool {
 		bot.didJoinChannels.Do(func() {
+			bot.Send("CAP REQ :twitch.tv/membership")
+			bot.Send("CAP REQ :twitch.tv/tags")
+			bot.Send("CAP REQ :twitch.tv/commands")
+
 			for _, channel := range bot.Channels {
 				splitchan := strings.SplitN(channel, ":", 2)
-				fmt.Println("splitchan is:", splitchan)
 				if len(splitchan) == 2 {
 					channel = splitchan[0]
 					password := splitchan[1]
@@ -392,49 +329,105 @@ func ReconOpt() func(*Bot) {
 	}
 }
 
-// Message represents a message received from the server
-type Message struct {
-	// irc.Message from sorcix
-	*irc.Message
-	// Content generally refers to the text of a PRIVMSG
-	Content string
+// func (bot *Bot) getNick() string {
+// 	return bot.Nick
+// }
 
-	//Time at which this message was recieved
-	TimeStamp time.Time
+func (bot *Bot) connect(host string) (err error) {
+	// bot.Debug("Connecting")
+	log.WithFields(
+		log.Fields{
+			"host": host,
+		}).Debug("connecting to server")
+	dial := bot.Dial
+	if dial == nil {
+		dial = net.Dial
+	}
+	dialTLS := bot.DialTLS
+	if dialTLS == nil {
+		dialTLS = tls.Dial
+	}
 
-	// Entity that this message was addressed to (channel or user)
-	To string
-
-	// Nick of the messages sender (equivalent to Prefix.Name)
-	// Outdated, please use .Name
-	From string
+	if bot.SSL {
+		bot.con, err = dialTLS("tcp", host, &bot.TLSConfig)
+	} else {
+		bot.con, err = dial("tcp", host)
+	}
+	return err
 }
 
-// Param returns the i'th parameter or the empty string if the requested element doesn't exist.
-func (m *Message) Param(i int) string {
-	if i < 0 || i >= len(m.Params) {
-		return ""
+// Incoming message gathering routine
+func (bot *Bot) handleIncomingMessages() {
+	scan := bufio.NewScanner(bot.con)
+	for scan.Scan() {
+		// Disconnect if we have seen absolutely nothing for 300 seconds
+		bot.con.SetDeadline(time.Now().Add(bot.PingTimeout))
+		msg, err := ParseMessage(scan.Text())
+		if err != nil {
+			log.WithFields(
+				log.Fields{
+					"err": err.Error(),
+				}).Error("failed to parse incoming message")
+		}
+		// bot.Debug("Incoming", "raw", scan.Text(), "msg.To", msg.To, "msg.From", msg.From, "msg.Params", msg.Params, "msg.Trailing", msg.Trailing())
+		log.WithFields(
+			log.Fields{
+				"raw": scan.Text(),
+				"msg.To": msg.To,
+				"msg.From": msg.From,
+				// "msg.Params": msg.Params,
+				// "msg.Trailing", msg.Trailing(),
+			}).Debug("incoming message")
+		go func() {
+			for _, h := range bot.handlers {
+				if h.Handle(bot, msg) {
+					break
+				}
+			}
+		}()
+		bot.Incoming <- msg
 	}
-	return m.Params[i]
+	close(bot.Incoming)
 }
 
-// ParseMessage takes a string and attempts to create a Message struct.
-// Returns nil if the Message is invalid.
-// TODO: Maybe just use sorbix/irc if we can be without the custom stuff?
-func ParseMessage(raw string) (m *Message) {
-	m = new(Message)
-	m.Message = irc.ParseMessage(raw)
-	m.Content = m.Trailing()
-
-	if len(m.Params) > 0 {
-		m.To = m.Params[0]
-	} else if m.Command == "JOIN" {
-		m.To = m.Trailing()
+// Handles message speed throtling
+func (bot *Bot) handleOutgoingMessages() {
+	for s := range bot.outgoing {
+		// bot.Debug("Outgoing", "data", s)
+		log.WithFields(
+			log.Fields{
+				"data": s,
+			}).Debug("outgoing message")
+		_, err := fmt.Fprint(bot.con, s+"\r\n")
+		if err != nil {
+			// bot.Error("handleOutgoingMessages fmt.Fprint error", "err", err)
+			log.WithFields(
+				log.Fields{
+					"err": err.Error(),
+				}).Error("failed to handle outgoing message")
+			return
+		}
+		time.Sleep(bot.ThrottleDelay)
 	}
-	if m.Prefix != nil {
-		m.From = m.Prefix.Name
-	}
-	m.TimeStamp = time.Now()
+}
 
-	return m
+// Set username, real name, and mode
+func (bot *Bot) sendUserCommand(user, realname string) {
+	bot.Send(fmt.Sprintf("USER %s 0 * :%s", user, realname))
+}
+
+// Splits a given string into a string slice, in chunks ending
+// either with \n, or with \r\n, or of a size of 400 characters.
+func splitText(text string) []string {
+	var ret []string
+	scanner := bufio.NewScanner(strings.NewReader(text))
+	for scanner.Scan() {
+		line := scanner.Text()
+		for len(line) > 400 {
+			ret = append(ret, line[:400])
+			line = line[400:]
+		}
+		ret = append(ret, line)
+	}
+	return ret
 }

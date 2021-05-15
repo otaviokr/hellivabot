@@ -9,7 +9,7 @@ import (
 
 type saslAuth struct {
 	mu     sync.Mutex
-	enable bool
+	// enable bool
 	user   string
 	pass   string
 }

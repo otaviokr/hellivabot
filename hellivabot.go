@@ -239,9 +239,9 @@ func (bot *Bot) Join(ch string) {
 	bot.Send("JOIN " + ch)
 }
 
-// Part a channel
-func (bot *Bot) Part(ch, msg string) {
-	bot.Send("PART " + ch + " " + msg)
+// Part a channel. Notice that Twitch does not expect a leave message, like default IRC.
+func (bot *Bot) Part(ch string) {
+	bot.Send("PART " + ch)
 }
 
 // Close closes the bot

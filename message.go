@@ -264,11 +264,20 @@ func ParseTwitchMessage(raw string) (*Message, error) {
 		}
 	}
 
-	// Parsing username from data[1]
-	username := regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[1])[1]
-	command := data[2]
-	channel := data[3]
-	content := data[4][1:]
+	// Some messages have a different pattern than others
+	var username, command, channel, content string
+	if len(data) == 3 {
+		// Parsing username from data[0]
+		username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[0])[1]
+		command = data[1]
+		channel = data[2]
+	} else {
+		// Parsing username from data[1]
+		username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[1])[1]
+		command = data[2]
+		channel = data[3]
+		content = data[4][1:]
+	}
 
 	return GenerateMessageObject(command, channel, username, content, badgeInfo, badges, clientNonce, color, displayName, flags, id,
 		mod, subscriber, roomId, timestamp, userId, emotes, unparsed), nil

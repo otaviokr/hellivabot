@@ -266,12 +266,18 @@ func ParseTwitchMessage(raw string) (*Message, error) {
 
 	// Some messages have a different pattern than others
 	var username, command, channel, content string
-	if len(data) == 3 {
+	switch (len(data)) {
+	case 1:
+		content = data[0]
+	case 2:
+		username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[0])[1]
+		command = data[1]
+	case 3:
 		// Parsing username from data[0]
 		username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[0])[1]
 		command = data[1]
 		channel = data[2]
-	} else {
+	default:
 		// Parsing username from data[1]
 		username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[1])[1]
 		command = data[2]

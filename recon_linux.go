@@ -2,7 +2,9 @@ package hbot
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"syscall"
 
 	"github.com/ftrvxmtrx/fd"
 )
@@ -69,4 +71,36 @@ func (bot *Bot) hijackSession() bool {
 	bot.reconnecting = true
 	bot.con = netcon
 	return true
+}
+
+// IsConnected hecks if connection is still open
+func (bot *Bot) IsConnected() error {
+	var sysErr error = nil
+	rc, err := bot.con.(syscall.Conn).SyscallConn()
+	if err != nil {
+		bot.Errorf("Bot is not connected: %v", err)
+		return err
+	}
+
+	err = rc.Read(func(fd uintptr) bool {
+		var buf []byte = []byte{0}
+		n, _, err := syscall.Recvfrom(int(fd), buf, syscall.MSG_PEEK | syscall.MSG_DONTWAIT)
+		switch {
+		case n == 0 && err == nil:
+			sysErr = io.EOF
+
+		case err == syscall.EAGAIN || err == syscall.EWOULDBLOCK:
+			sysErr = nil
+
+		default:
+			sysErr = err
+		}
+
+		return true
+	})
+	if err != nil {
+		return err
+	}
+
+	return sysErr
 }

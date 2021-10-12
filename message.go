@@ -28,7 +28,7 @@ const (
 	PrivateMessageUserSignature string = ":(.+)!.+@.+\\.tmi\\.twitch\\.tv"
 
 	PingSignature string = "PING :tmi\\.twitch\\.tv"
-	NoticeSignature string = "@msg-id=(.+) :tmi\\.twitch\\.tv (NOTICE) (#.+) :(.+)"
+	NoticeSignature string = "@msg-id=(.+):tmi\\.twitch\\.tv (NOTICE) (#.+) :(.+)"
 )
 
 type Emote struct {
@@ -134,6 +134,7 @@ func ParseMessage(raw string) (*Message, error) {
 	// If it is not one of the system messages, we assume it is a regular message from one of the users.
 	return ParseTwitchMessage(raw)
 }
+
 func parseTagAndVersion(raw string) (string, int) {
 	details := strings.Split(raw, "/")
 
@@ -161,7 +162,7 @@ func ParseTwitchMessage(raw string) (*Message, error) {
 	emotes := map[string]Emote{}
 
 	unparsed := map[string]string{}
-	log.Infof("Incoming: %s", raw)
+	// log.Infof("Incoming: %s", raw)
 
 	// Separate tags from the actual message
 	data := strings.SplitN(raw, " ", 5)
@@ -270,9 +271,8 @@ func ParseTwitchMessage(raw string) (*Message, error) {
 	case 1:
 		content = data[0]
 	case 2:
-		//username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[0])[1]
-		username = data[0]
-		command = data[1]
+		command = data[0]
+		content = data[1]
 	case 3:
 		// Parsing username from data[0]
 		username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[0])[1]

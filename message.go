@@ -270,7 +270,8 @@ func ParseTwitchMessage(raw string) (*Message, error) {
 	case 1:
 		content = data[0]
 	case 2:
-		username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[0])[1]
+		//username = regexp.MustCompile(PrivateMessageUserSignature).FindStringSubmatch(data[0])[1]
+		username = data[0]
 		command = data[1]
 	case 3:
 		// Parsing username from data[0]

@@ -161,7 +161,7 @@ func ParseTwitchMessage(raw string) (*Message, error) {
 	emotes := map[string]Emote{}
 
 	unparsed := map[string]string{}
-	// log.Infof("Incoming: %s", raw)
+	log.Infof("Incoming: %s", raw)
 
 	// Separate tags from the actual message
 	data := strings.SplitN(raw, " ", 5)
